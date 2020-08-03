@@ -137,9 +137,9 @@ for model in population_set:
 #                 print(probs_pl1_data.head, pl1_move_wide_data.head)
             brier_pl1 = brier_multi(y_true_pl1, y_prob_pl1)
             container = []
-            wide_brier = wide_brier_calc(simulation_df, alt_simulation_df, container, model,alt_model )
+            wide_brier = wide_brier_calc(simulation_df, alt_simulation_df, container, model,alt_model, set_numbers)
 #                 print(np.round(brier_pl1,3)-np.round(np.mean(wide_brier["brier_score"]),3) )
-            for one_set in range(set_nubmbs):
+            for one_set in set_numbers:
                 dct = dict((('brier', (wide_brier["brier_score"][one_set])),( "sd_brier", np.std(wide_brier["brier_score"])),
                   ("log_score", np.mean(wide_brier["log_score"])), ("sd_log_score", np.std(wide_brier["log_score"])), 
                   ('player','pl_1'),('true_model', model), ('alt_model',  alt_model), ('set', wide_brier["set_numb"][one_set])))
