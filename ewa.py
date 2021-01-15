@@ -8,14 +8,16 @@ import pandas as pd
 import random
 import csv
 import itertools
+import functools
+
 
 from scipy.special import softmax
 
 class SEWA:
-    def __init__(self, probs, attractions, pl_num,action_space,ro,delta,phi,N_in,lambd, game_matrix):
+    def __init__(self, probs, attr_s1, pl_num, action_space,ro,delta,phi,N_in,lambd, if_strategic,game_matrix):
         self.strat_space = np.array(list(itertools.product(*[action_space]*3)))
         self.action_space = np.array(action_space)
-        self.attractions = attractions
+        self.attr_s1 = np.array(list(itertools.product(*[action_space]*3)))
         self.lambd = lambd
         self.N_in = N_in
         self.ro = ro
@@ -24,7 +26,7 @@ class SEWA:
         self.probs = self.get_initial_prob(self.action_space)
         self.history = []
         self.game_matrix = game_matrix
-        self.step_attractions = [1.]*self.action_space
+        self.step_attr_s1 = [1.]*self.action_space
         self.pl_num = pl_num
 
 
@@ -48,7 +50,7 @@ class SEWA:
         payof matrix view
         return payoff for current move: float
         """
-        z=self.game_matrix.loc[alter_move, self.strat_space[index]]
+        z=self.game_matrix.loc[alter_move, self.action_space[index]]
         return z
 
     def p(self, int_a, set_a):
@@ -59,7 +61,7 @@ class SEWA:
 
     def get_A(self, N_in, a, index, ego_move, alter_move):
         """
-        function for computing round's attractions 
+        function for computing round's attr_s1 
         return new attraction for round: float
         """
         I = int(self.action_space[index] == ego_move)
@@ -73,28 +75,29 @@ class SEWA:
         """
         for i in range(self.strat_space.shape[0]):
             for g in range(len(self.action_space)):
-                if self.strat_space[i] == history + [g]:
-                   self.step_attractions[g] = i
+                if functools.reduce(lambda x, y : x and y, map(lambda p, q: p == q,self.strat_space[i],self.history + [g]), True):
+#                 if self.strat_space[i] == self.history + [g]:
+                   self.step_attr_s1[g] = i
         # for g in range(3):
         #     self.probs[g] = self.probs[g]/summa 
 
-    def EWA_compute_new_prmtrs (self, u, pl_1_mov, pl_2_mov):
+    def EWA_compute_new_prmtrs (self, pl_1_mov, pl_2_mov):
         """
-        recalculate new attractions from old attractions and recent game history 
+        recalculate new attr_s1 from old attr_s1 and recent game history 
         """
-        new_as = self.attractions
+        new_as = self.attr_s1
         N_in = self.N_in
         bin_v = int(self.pl_num == 1)
         ego_move = (pl_1_mov * bin_v + (1 - bin_v) * pl_2_mov)
         alter_move = (pl_2_mov * bin_v + (1 - bin_v) * pl_1_mov)
         self.history = [ego_move, alter_move]
         self.strategy_met_history()
-        for  idx in self.step_attractions:
-            new_as[idx] = self.get_A(N_in, a, i, ego_move, alter_move)        
-        self.attractions = new_as
+        for idx, a in enumerate(self.step_attr_s1):
+            new_as[idx] = self.get_A(N_in, a, idx, ego_move, alter_move)        
+        self.attr_s1 = new_as
         new_ps = []
-        for a in self.step_attractions:
-            new_ps.append(self.p(a, self.step_attractions))        
+        for a in self.step_attr_s1:
+            new_ps.append(self.p(a, self.step_attr_s1))        
         self.probs = new_ps
         self.N_in = self.get_new_N(N_in)
 
@@ -137,19 +140,19 @@ class EWA:
         game_matrix - payoff matrix
 
     """
-    def __init__ (self,prob_s1,attr_s1,pl_num,strat_space,ro,delta,phi,N_in,lambd, game_matrix):
+    def __init__ (self,probs,attr_s1,pl_num,action_space,ro,delta,phi,N_in,lambd, if_strategic, game_matrix):
 #       initial parameters
         self.attr_s1 = attr_s1
         self.lambd = lambd
-        self.prob_s1 = self.get_initial_prob(self.attr_s1)
+        self.probs = self.get_initial_prob(self.attr_s1)
         self.pl_num = pl_num
-        self.strat_space = strat_space
+        self.action_space = action_space
         self.ro = ro 
         self.delta = delta 
         self.phi = phi 
         self.N_in = N_in 
         # extra steps to accomodate possibility of non-quadratic game matrices
-        self.strat_space = game_matrix.columns.values
+        self.action_space = game_matrix.columns.values
         self.game_matrix = game_matrix
 
 
@@ -181,23 +184,23 @@ class EWA:
         payof matrix view
         return payoff for current move: float
         """
-        z=self.game_matrix.loc[alter_move, self.strat_space[index]]
+        z=self.game_matrix.loc[alter_move, self.action_space[index]]
         return z
 
 
     def get_A(self, N_in, a, index, ego_move, alter_move):
         """
-        function for computing round's attractions 
+        function for computing round's attr_s1 
         return new attraction for round: float
         """
-        I = int(self.strat_space[index] == ego_move)
-        new_a = (self.phi * N_in * a + (self.delta + (1 - self.delta) * I) *self.get_payoff(alter_move, self.strat_space[index])) / self.get_new_N(N_in)
+        I = int(self.action_space[index] == ego_move)
+        new_a = (self.phi * N_in * a + (self.delta + (1 - self.delta) * I) *self.get_payoff(alter_move, self.action_space[index])) / self.get_new_N(N_in)
         return new_a
     
     # 
     def EWA_compute_new_prmtrs (self,  pl_1_mov, pl_2_mov):
         """
-        recalculate new attractions from old attractions and recent game history 
+        recalculate new attr_s1 from old attr_s1 and recent game history 
         """
         new_as = []
         N_in=self.N_in
@@ -211,5 +214,5 @@ class EWA:
         new_ps = []
         for a in self.attr_s1:
             new_ps.append(self.p(a, self.attr_s1))        
-        self.prob_s1 = new_ps
+        self.probs = new_ps
         self.N_in = self.get_new_N(N_in)
